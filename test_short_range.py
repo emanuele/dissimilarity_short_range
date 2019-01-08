@@ -17,7 +17,8 @@ from euclidean_embeddings.subsampling import compute_subset
 if __name__ == '__main__':
     np.random.seed(42)
     filename = 'data/sub-100206/sub-100206_var-FNAL_tract.trk'
-    k = 20
+    embedding = 'DR'
+    k = 100
     distance_function = bundles_distances_mdf
     # distance_function = bundles_distances_mam
     nb_points = 20
@@ -26,7 +27,6 @@ if __name__ == '__main__':
     distance_threshold = 20.0
     max_neighbors = 200
     max_streamlines = 100000
-    fast = True
     savefig = True
     extension_format = '.jpg'
 
@@ -37,23 +37,22 @@ if __name__ == '__main__':
         print("Resampling streamlines to %s points because of MDF" % nb_points)
         streamlines = set_number_of_points(streamlines, nb_points=nb_points)
         distance_name = 'MDF%d' % nb_points
-    else:
+    elif distance_function == bundles_distances_mam:
         distance_name = 'MAM'
+    else:
+        raise NotImplementedError
 
     # landmark_policy = 'random'
     landmark_policy = 'sff'
-    if not fast:
-        print("Computing the dissimilarity representation")
-        dm, prototype_idx = dissimilarity.compute_dissimilarity(dataset=streamlines,
-                                                                distance=distance_function,
-                                                                k=k,
-                                                                prototype_policy=landmark_policy)
-    else:
+    if embedding == 'DR':
         print("Computing %s prototypes with %s policy" % (k, landmark_policy))
         prototype_idx = compute_subset(dataset=streamlines,
                                        distance=distance_function,
                                        num_landmarks=k,
                                        landmark_policy=landmark_policy)
+        embedding_name = embedding + '%03d' % k
+    else:
+        raise NotImplementedError
 
     original_distance = []
     euclidean_distance = []
@@ -73,12 +72,14 @@ if __name__ == '__main__':
         streamline1_idx.append([idx] * len(tmp))
         streamline2_idx.append(tmp)
         original_distance.append(distances[tmp])
-        if not fast:
-            euclidean_distance.append(np.linalg.norm(dm[idx, :] - dm[tmp, :], axis=1))
-        else:
+        if embedding == 'DR':
             v_s1 = distance_function([s1], streamlines[prototype_idx])
-            v_neighbors = distance_function(streamlines[tmp], streamlines[prototype_idx])
-            euclidean_distance.append(np.linalg.norm(v_s1 - v_neighbors, axis=1))
+            v_neighbors = distance_function(streamlines[tmp],
+                                            streamlines[prototype_idx])
+        else:
+            raise NotImplementedError
+
+        euclidean_distance.append(np.linalg.norm(v_s1 - v_neighbors, axis=1))
 
     streamline1_idx = np.concatenate(streamline1_idx)
     streamline2_idx = np.concatenate(streamline2_idx)
@@ -93,8 +94,11 @@ if __name__ == '__main__':
     plt.plot(original_distance, euclidean_distance, 'o')
     plt.xlabel('$'+distance_name+'$')
     plt.ylabel('Euclidean distance')
-    plt.title(r'$%s$ vs Euclid(DR%d): $\rho$=%f' % (distance_name, k, global_correlation))
-    filename = '%s_vs_DR%03d_%d_%d' % (distance_name, k, original_distance.min(), distance_threshold)
+    plt.title(r'$%s$ vs Euclid(%s): $\rho$=%f' % (distance_name,
+                                                  embedding_name,
+                                                  global_correlation))
+    filename = '%s_vs_%s_%d_%d' % (distance_name, embedding_name,
+                                   original_distance.min(), distance_threshold)
     if savefig:
         plt.savefig(filename + extension_format)
     
@@ -115,7 +119,8 @@ if __name__ == '__main__':
     plt.bar(distance_threshold_min, correlations, width=np.diff(distance_threshold_min).mean())
     plt.xlabel(distance_name)
     plt.ylabel('correlation')
-    plt.title(r'$\rho$($%s$, Euclid(DR%d)) in different intervals' % (distance_name, k))
+    plt.title(r'$\rho$($%s$, Euclid(%s)) in different intervals' % (distance_name,
+                                                                    embedding_name))
     plt.xlim([distance_threshold_min.min(), distance_threshold_min.max()])
     plt.ylim([min(0, correlations.min()), 1.0])
     plt.plot([distance_threshold_min.min(),

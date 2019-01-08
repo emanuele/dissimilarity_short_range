@@ -12,12 +12,13 @@ from dipy.tracking.distances import (bundles_distances_mdf,
                                      bundles_distances_mam)
 from dipy.tracking.streamline import set_number_of_points
 from euclidean_embeddings.subsampling import compute_subset
+import os
 
 
 if __name__ == '__main__':
     np.random.seed(42)
     filename = 'data/sub-100206/sub-100206_var-FNAL_tract.trk'
-    embedding = 'DR'
+    embedding = 'DR'  # 'FLAT'  # 
     k = 100
     distance_function = bundles_distances_mdf
     # distance_function = bundles_distances_mam
@@ -29,6 +30,9 @@ if __name__ == '__main__':
     max_streamlines = 100000
     savefig = True
     extension_format = '.jpg'
+    results_dir = 'results/'
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
 
     print("Loading %s" % filename)
     streamlines2 = nib.streamlines.load(filename).streamlines
@@ -36,10 +40,11 @@ if __name__ == '__main__':
     streamlines = streamlines2[np.random.permutation(len(streamlines2))[:max_streamlines]]
     if distance_function == bundles_distances_mdf:
         print("Resampling streamlines to %s points because of MDF" % nb_points)
-        streamlines = set_number_of_points(streamlines, nb_points=nb_points)
+        streamlines = np.array(set_number_of_points(streamlines, nb_points=nb_points))
         distance_name = 'MDF%d' % nb_points
     elif distance_function == bundles_distances_mam:
         distance_name = 'MAM'
+        streamlines = np.array(streamlines, dtype=np.object)
     else:
         raise NotImplementedError
 
@@ -52,6 +57,9 @@ if __name__ == '__main__':
                                        num_landmarks=k,
                                        landmark_policy=landmark_policy)
         embedding_name = embedding + '%03d' % k
+    elif embedding == 'FLAT':
+        embedding_name = embedding
+        assert(distance_function == bundles_distances_mdf)
     else:
         raise NotImplementedError
 
@@ -78,6 +86,9 @@ if __name__ == '__main__':
             v_s1 = distance_function([s1], streamlines[prototype_idx])
             v_neighbors = distance_function(streamlines[tmp],
                                             streamlines[prototype_idx])
+        elif embedding == 'FLAT':
+            v_s1 = s1.flatten()
+            v_neighbors = streamlines[tmp].reshape(tmp.shape[0], -1)
         else:
             raise NotImplementedError
 
@@ -99,10 +110,12 @@ if __name__ == '__main__':
     plt.title(r'$%s$ vs Euclid(%s): $\rho$=%f' % (distance_name,
                                                   embedding_name,
                                                   global_correlation))
-    filename = '%s_vs_%s_%d_%d' % (distance_name, embedding_name,
-                                   original_distance.min(), distance_threshold)
+    filename_fig = results_dir + '%s_vs_%s_%d_%d' % (distance_name,
+                                                     embedding_name,
+                                                     original_distance.min(),
+                                                     distance_threshold)
     if savefig:
-        plt.savefig(filename + extension_format)
+        plt.savefig(filename_fig + extension_format)
     
     print("Local correlation:")
     n_steps = 10
@@ -135,4 +148,4 @@ if __name__ == '__main__':
              label=r'avg $\rho$')
     plt.legend()
     if savefig:
-        plt.savefig(filename + '_correlations' + extension_format)
+        plt.savefig(filename_fig + '_correlations' + extension_format)

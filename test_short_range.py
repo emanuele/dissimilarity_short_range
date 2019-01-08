@@ -32,6 +32,7 @@ if __name__ == '__main__':
 
     print("Loading %s" % filename)
     streamlines2 = nib.streamlines.load(filename).streamlines
+    print("Subsampling %s at random from the whole tractogram, to reduce computations")
     streamlines = streamlines2[np.random.permutation(len(streamlines2))[:max_streamlines]]
     if distance_function == bundles_distances_mdf:
         print("Resampling streamlines to %s points because of MDF" % nb_points)
@@ -58,6 +59,7 @@ if __name__ == '__main__':
     euclidean_distance = []
     streamline1_idx = []
     streamline2_idx = []
+    print("Randomly subsampling %s streamlines for nearest-neighbors queries" % n)
     s1_idx = np.random.permutation(len(streamlines))[:n]
     for i, idx in enumerate(s1_idx):
         print(i)

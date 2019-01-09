@@ -6,7 +6,7 @@ streamlines.
 
 import numpy as np
 import nibabel as nib
-from euclidean_embeddings import distances, dissimilarity
+from euclidean_embeddings import dissimilarity
 from functools import partial
 from dipy.tracking.distances import (bundles_distances_mdf,
                                      bundles_distances_mam)
@@ -17,20 +17,22 @@ import os
 
 if __name__ == '__main__':
     np.random.seed(42)
-    filename = 'data/sub-100206/sub-100206_var-FNAL_tract.trk'
-    embedding = 'DR'  # 'FLAT'  # 
-    k = 100
-    distance_function = bundles_distances_mdf
-    # distance_function = bundles_distances_mam
+    filename_idx = 0
+    filenames = ['data/sub-100206/sub-100206_var-FNAL_tract.trk', 'sub-500222_var-EPR_tract.tck']
+    filename = filenames[filename_idx]
+    embedding = 'DR'  # 'FLATFLIP'  # 'FLIP'
+    k = 40
+    # distance_function = bundles_distances_mdf
+    distance_function = bundles_distances_mam
     nb_points = 20
     # distance_function = partial(distances.parallel_distance_computation, distance=bundles_distances_mam)
     n = 300  # number of streamlines to query for neighbors
-    distance_threshold = 20.0
+    distance_threshold = 200.0
     max_neighbors = 200
     max_streamlines = 100000
     savefig = True
     extension_format = '.jpg'
-    results_dir = 'results/'
+    results_dir = 'results_%d/' % filename_idx
     if not os.path.exists(results_dir):
         os.makedirs(results_dir)
 
@@ -38,8 +40,8 @@ if __name__ == '__main__':
     streamlines2 = nib.streamlines.load(filename).streamlines
     print("Subsampling %s at random from the whole tractogram, to reduce computations")
     streamlines = streamlines2[np.random.permutation(len(streamlines2))[:max_streamlines]]
-    if distance_function == bundles_distances_mdf:
-        print("Resampling streamlines to %s points because of MDF" % nb_points)
+    if distance_function == bundles_distances_mdf or embedding == 'FLAT' or embedding == 'FLATFLIP':
+        print("Resampling streamlines to %s points because of MDF or FLAT embedding" % nb_points)
         streamlines = np.array(set_number_of_points(streamlines, nb_points=nb_points))
         distance_name = 'MDF%d' % nb_points
     elif distance_function == bundles_distances_mam:
@@ -57,9 +59,9 @@ if __name__ == '__main__':
                                        num_landmarks=k,
                                        landmark_policy=landmark_policy)
         embedding_name = embedding + '%03d' % k
-    elif embedding == 'FLAT':
+    elif embedding == 'FLAT' or embedding == 'FLATFLIP':
         embedding_name = embedding
-        assert(distance_function == bundles_distances_mdf)
+        # assert(distance_function == bundles_distances_mdf)
     else:
         raise NotImplementedError
 
@@ -69,6 +71,7 @@ if __name__ == '__main__':
     streamline2_idx = []
     print("Randomly subsampling %s streamlines for nearest-neighbors queries" % n)
     s1_idx = np.random.permutation(len(streamlines))[:n]
+    print("Computing %s on streamlines vs Euclidean distance on %s" % (distance_name, embedding_name))
     for i, idx in enumerate(s1_idx):
         print(i)
         s1 = streamlines[idx]
@@ -86,13 +89,18 @@ if __name__ == '__main__':
             v_s1 = distance_function([s1], streamlines[prototype_idx])
             v_neighbors = distance_function(streamlines[tmp],
                                             streamlines[prototype_idx])
-        elif embedding == 'FLAT':
+        elif embedding == 'FLAT' or embedding == 'FLATFLIP':
             v_s1 = s1.flatten()
             v_neighbors = streamlines[tmp].reshape(tmp.shape[0], -1)
         else:
             raise NotImplementedError
 
-        euclidean_distance.append(np.linalg.norm(v_s1 - v_neighbors, axis=1))
+        if embedding == 'FLATFLIP':
+            direct_distances = np.linalg.norm(v_s1 - v_neighbors, axis=1)
+            flipped_distances = np.linalg.norm(v_s1.reshape(-1, 3)[::-1].flatten() - v_neighbors, axis=1)
+            euclidean_distance.append(np.minimum(direct_distances, flipped_distances))
+        else:
+            euclidean_distance.append(np.linalg.norm(v_s1 - v_neighbors, axis=1))
 
     streamline1_idx = np.concatenate(streamline1_idx)
     streamline2_idx = np.concatenate(streamline2_idx)
@@ -115,12 +123,14 @@ if __name__ == '__main__':
                                                      original_distance.min(),
                                                      distance_threshold)
     if savefig:
-        plt.savefig(filename_fig + extension_format)
+        tmp = filename_fig + extension_format
+        print('Saving figure to %s' % tmp)
+        plt.savefig(tmp)
     
     print("Local correlation:")
     n_steps = 10
     distance_threshold_min = np.linspace(0, original_distance.max(), n_steps)
-    correlations = np.zeros(n_steps)
+    correlations = np.zeros(n_steps - 1)
     for i, (dtmin, dtmax) in enumerate(zip(distance_threshold_min[:-1], distance_threshold_min[1:])):
         tmp = np.logical_and(original_distance > dtmin, original_distance <= dtmax)
         # tmp = original_distance <= dtmax
@@ -148,4 +158,6 @@ if __name__ == '__main__':
              label=r'avg $\rho$')
     plt.legend()
     if savefig:
-        plt.savefig(filename_fig + '_correlations' + extension_format)
+        tmp = filename_fig + '_correlations' + extension_format
+        print('Saving figure to %s' % tmp)
+        plt.savefig(tmp)

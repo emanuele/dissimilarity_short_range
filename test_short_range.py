@@ -25,7 +25,7 @@ def experiment(filename_idx, embedding, k, distance_function, nb_points, distanc
     if not os.path.exists(results_dir):
         os.makedirs(results_dir)
 
-    filenames = ['data/sub-100206/sub-100206_var-FNAL_tract.trk', 'sub-500222_var-EPR_tract.tck']
+    filenames = ['sub-100206_var-FNAL_tract.trk', 'sub-500222_var-EPR_tract.tck']
     filename = filenames[filename_idx]
     print("Loading %s" % filename)
     streamlines2 = nib.streamlines.load(filename).streamlines

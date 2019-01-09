@@ -15,19 +15,8 @@ from euclidean_embeddings.subsampling import compute_subset
 import os
 
 
-if __name__ == '__main__':
-    np.random.seed(42)
-    filename_idx = 0
-    filenames = ['data/sub-100206/sub-100206_var-FNAL_tract.trk', 'sub-500222_var-EPR_tract.tck']
-    filename = filenames[filename_idx]
-    embedding = 'DR'  # 'FLATFLIP'  # 'FLIP'
-    k = 40
-    # distance_function = bundles_distances_mdf
-    distance_function = bundles_distances_mam
-    nb_points = 20
-    # distance_function = partial(distances.parallel_distance_computation, distance=bundles_distances_mam)
+def experiment(filename_idx, embedding, k, distance_function, nb_points, distance_threshold):
     n = 300  # number of streamlines to query for neighbors
-    distance_threshold = 200.0
     max_neighbors = 200
     max_streamlines = 100000
     savefig = True
@@ -36,6 +25,8 @@ if __name__ == '__main__':
     if not os.path.exists(results_dir):
         os.makedirs(results_dir)
 
+    filenames = ['data/sub-100206/sub-100206_var-FNAL_tract.trk', 'sub-500222_var-EPR_tract.tck']
+    filename = filenames[filename_idx]
     print("Loading %s" % filename)
     streamlines2 = nib.streamlines.load(filename).streamlines
     print("Subsampling %s at random from the whole tractogram, to reduce computations")
@@ -141,7 +132,7 @@ if __name__ == '__main__':
 
     plt.figure()
     # plt.hist(correlations, bins=distance_threshold_min)
-    plt.bar(distance_threshold_min, correlations, width=np.diff(distance_threshold_min).mean())
+    plt.bar(distance_threshold_min[:-1], correlations, width=np.diff(distance_threshold_min).mean())
     plt.xlabel(distance_name)
     plt.ylabel('correlation')
     plt.title(r'$\rho$($%s$, Euclid(%s)) in different intervals' % (distance_name,
@@ -161,3 +152,15 @@ if __name__ == '__main__':
         tmp = filename_fig + '_correlations' + extension_format
         print('Saving figure to %s' % tmp)
         plt.savefig(tmp)
+
+
+if __name__ == '__main__':
+    np.random.seed(42)
+    filename_idx = 0
+    embedding = 'DR'  # 'FLATFLIP'  # 'FLIP'
+    k = 40
+    distance_function = bundles_distances_mdf
+    # distance_function = bundles_distances_mam
+    nb_points = 20
+    distance_threshold = 200.0
+    experiment(filename_idx, embedding, k, distance_function, nb_points, distance_threshold)

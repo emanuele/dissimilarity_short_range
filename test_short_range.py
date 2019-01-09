@@ -29,7 +29,7 @@ def experiment(filename_idx, embedding, k, distance_function, nb_points, distanc
     filename = filenames[filename_idx]
     print("Loading %s" % filename)
     streamlines2 = nib.streamlines.load(filename).streamlines
-    print("Subsampling %s at random from the whole tractogram, to reduce computations")
+    print("Subsampling %s at random from the whole tractogram, to reduce computations" % max_streamlines)
     streamlines = streamlines2[np.random.permutation(len(streamlines2))[:max_streamlines]]
     if distance_function == bundles_distances_mdf or embedding == 'FLAT' or embedding == 'FLATFLIP':
         print("Resampling streamlines to %s points because of MDF or FLAT embedding" % nb_points)
